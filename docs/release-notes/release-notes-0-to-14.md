@@ -1,3 +1,47 @@
+## 1.3.0 - February 13, 2025
+
+[All Release Changes](https://github.com/SAP/ai-sdk-java/releases/tag/rel%2F1.3.0)
+
+### 🔧 Compatibility Notes
+
+- `Message.content()` returns a `ContentItem` now instead of a `String`. Use `((TextItem) Message.content().items().get(0)).text()` if the corresponding `ContentItem` is a `TextItem` and the string representation is needed.
+
+### ✨ New Functionality
+
+- Upgrade to release 2502a of AI Core.
+- Orchestration:
+  - [Add `LlamaGuardFilter`](https://github.com/SAP/ai-sdk-java/tree/main/docs/guides/ORCHESTRATION_CHAT_COMPLETION.md#chat-completion-filter).
+  - [Convenient methods to create messages containing images and multiple text inputs](https://github.com/SAP/ai-sdk-java/tree/main/docs/guides/ORCHESTRATION_CHAT_COMPLETION.md#add-images-and-multiple-text-inputs-to-a-message)
+  - [Enable setting the response format](https://github.com/SAP/ai-sdk-java/tree/main/docs/guides/ORCHESTRATION_CHAT_COMPLETION.md#set-a-response-format)
+
+
+## 1.2.0 - January 30, 2025
+
+[All Release Changes](https://github.com/SAP/ai-sdk-java/releases/tag/rel%2F1.2.0)
+
+### 🔧 Compatibility Notes
+
+- `SingleChatMessage`, as well as new `MultiChatMessage`, are now subtypes of new interface `ChatMessage`.
+  Most variables or methods previously typed as `ChatMessage` in `model` package are now typed as `SingleChatMessage`. 
+- Add missing `@Beta` annotations to all `com.sap.ai.sdk.core.client` and `com.sap.ai.sdk.core.model` classes.
+
+### ✨ New Functionality
+
+- New Orchestration features:
+  - [Spring AI integration](https://github.com/SAP/ai-sdk-java/tree/main/docs/guides/SPRING_AI_INTEGRATION.md)
+  - [Add Grounding configuration convenience](https://github.com/SAP/ai-sdk-java/tree/main/docs/guides/ORCHESTRATION_CHAT_COMPLETION.md#grounding)
+  - Images are now supported as input in newly introduced `MultiChatMessage`.
+  - `MultiChatMessage` also allows for multiple content items (text or image) in one object.
+  - Grounding input can be masked with `DPIConfig`.
+  - LLama Guard can now be used for content filtering.
+  - Support for tool calling and response format
+  - Updated the list for supported models (e.g., added amazon nova models).
+
+### 📈 Improvements
+
+- Update Orchestration client to version 0.48.2 (2501a)
+
+
 ## 1.1.0 - January 07, 2025
 
 [All Release Changes](https://github.com/SAP/ai-sdk-java/releases/tag/rel%2F1.1.0)

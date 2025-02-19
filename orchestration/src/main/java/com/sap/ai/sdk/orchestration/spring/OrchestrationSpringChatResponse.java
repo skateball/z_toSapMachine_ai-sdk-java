@@ -5,14 +5,13 @@ import com.sap.ai.sdk.orchestration.OrchestrationChatResponse;
 import com.sap.ai.sdk.orchestration.model.LLMChoice;
 import com.sap.ai.sdk.orchestration.model.LLMModuleResultSynchronous;
 import com.sap.ai.sdk.orchestration.model.TokenUsage;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.val;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -43,21 +42,18 @@ public class OrchestrationSpringChatResponse extends ChatResponse {
 
   @Nonnull
   static List<Generation> toGenerations(@Nonnull final LLMModuleResultSynchronous result) {
-    return result.getChoices().stream()
-        .map(OrchestrationSpringChatResponse::toAssistantMessage)
-        .map(Generation::new)
-        .toList();
+    return result.getChoices().stream().map(OrchestrationSpringChatResponse::toGeneration).toList();
   }
 
   @Nonnull
-  static AssistantMessage toAssistantMessage(@Nonnull final LLMChoice choice) {
-    final Map<String, Object> metadata = new HashMap<>();
-    metadata.put("finish_reason", choice.getFinishReason());
-    metadata.put("index", choice.getIndex());
+  static Generation toGeneration(@Nonnull final LLMChoice choice) {
+    val metadata = ChatGenerationMetadata.builder().finishReason(choice.getFinishReason());
+    metadata.metadata("index", choice.getIndex());
     if (!choice.getLogprobs().isEmpty()) {
-      metadata.put("logprobs", choice.getLogprobs());
+      metadata.metadata("logprobs", choice.getLogprobs());
     }
-    return new AssistantMessage(choice.getMessage().getContent(), metadata);
+    val message = new AssistantMessage(choice.getMessage().getContent());
+    return new Generation(message, metadata.build());
   }
 
   @Nonnull

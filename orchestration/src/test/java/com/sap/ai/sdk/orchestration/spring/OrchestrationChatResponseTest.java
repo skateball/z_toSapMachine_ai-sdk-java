@@ -8,23 +8,23 @@ import com.sap.ai.sdk.orchestration.model.ResponseChatMessage;
 import com.sap.ai.sdk.orchestration.model.TokenUsage;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.Generation;
 
 class OrchestrationChatResponseTest {
 
   @Test
-  void testToAssistantMessage() {
+  void testToGeneration() {
     var choice =
         LLMChoice.create()
             .index(0)
             .message(ResponseChatMessage.create().role("assistant").content("Hello, world!"))
             .finishReason("stop");
 
-    AssistantMessage message = OrchestrationSpringChatResponse.toAssistantMessage(choice);
+    Generation generation = OrchestrationSpringChatResponse.toGeneration(choice);
 
-    assertThat(message.getContent()).isEqualTo("Hello, world!");
-    assertThat(message.getMetadata()).containsEntry("finish_reason", "stop");
-    assertThat(message.getMetadata()).containsEntry("index", 0);
+    assertThat(generation.getOutput().getContent()).isEqualTo("Hello, world!");
+    assertThat(generation.getMetadata().getFinishReason()).isEqualTo("stop");
+    assertThat(generation.getMetadata().<Integer>get("index")).isEqualTo(0);
   }
 
   @Test

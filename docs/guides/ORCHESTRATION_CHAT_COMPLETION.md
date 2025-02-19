@@ -12,6 +12,8 @@
     - [Data Masking](#data-masking)
     - [Grounding](#grounding)
     - [Stream chat completion](#stream-chat-completion)
+    - [Add images and multiple text inputs to a message](#add-images-and-multiple-text-inputs-to-a-message)
+    - [Set a Response Format](#set-a-response-format)
     - [Set Model Parameters](#set-model-parameters)
     - [Using a Configuration from AI Launchpad](#using-a-configuration-from-ai-launchpad)
 
@@ -83,7 +85,7 @@ var config = new OrchestrationModuleConfig()
         .withLlmConfig(OrchestrationAiModel.GPT_4O);
 ```
 
-Please also refer to [our sample code](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/controllers/OrchestrationController.java) for this and all following code examples.
+Please also refer to [our sample code](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/services/OrchestrationService.java) for this and all following code examples.
   
 ## Chat Completion
 
@@ -158,8 +160,11 @@ var filterLoose = new AzureContentFilter()
                 .sexual(ALLOW_SAFE_LOW_MEDIUM)
     .violence(ALLOW_SAFE_LOW_MEDIUM);
 
+// choose Llama Guard filter or/and Azure filter
+var llamaGuardFilter = new LlamaGuardFilter().config(LlamaGuard38b.create().selfHarm(true));
+
 // changing the input to filterLoose will allow the message to pass
-var configWithFilter = config.withInputFiltering(filterStrict).withOutputFiltering(filterStrict);
+var configWithFilter = config.withInputFiltering(filterStrict).withOutputFiltering(filterStrict, llamaGuardFilter);
 
 // this fails with Bad Request because the strict filter prohibits the input message
 var result =
@@ -176,7 +181,7 @@ var result =
   The convenience method `getContent()` on the resulting object will throw an `OrchestrationClientException` upon invocation.
   The low level API under `getOriginalResponse()` will not throw an exception.
 
-You will find [some examples](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/controllers/OrchestrationController.java) in our Spring Boot application demonstrating response handling with filters.
+You will find [some examples](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/services/OrchestrationService.java) in our Spring Boot application demonstrating response handling with filters.
 
 ## Data masking
 
@@ -206,31 +211,31 @@ In this example, the input will be masked before the call to the LLM and will re
 Use the grounding module to provide additional context to the AI model. 
 
 ```java
-    var message =
-        Message.user(
-            "{{?groundingInput}} Use the following information as additional context: {{?groundingOutput}}");
-    var prompt =
-        new OrchestrationPrompt(Map.of("groundingInput", "What does Joule do?"), message);
+// optional filter for collections
+var documentMetadata =
+    SearchDocumentKeyValueListPair.create()
+        .key("my-collection")
+        .value("value")
+        .addSelectModeItem(SearchSelectOptionEnum.IGNORE_IF_KEY_ABSENT);
+// optional filter for document chunks
+var databaseFilter =
+    DocumentGroundingFilter.create()
+        .id("")
+        .dataRepositoryType(DataRepositoryType.VECTOR)
+        .addDocumentMetadataItem(documentMetadata);
 
-    var filterInner =
-        DocumentGroundingFilter.create().id("someID").dataRepositoryType(DataRepositoryType.VECTOR);
-    var groundingConfigConfig =
-        GroundingModuleConfigConfig.create()
-            .inputParams(List.of("groundingInput"))
-            .outputParam("groundingOutput")
-            .addFiltersItem(filterInner);
-    
-    var groundingConfig =
-        GroundingModuleConfig.create()
-            .type(GroundingModuleConfig.TypeEnum.DOCUMENT_GROUNDING_SERVICE)
-            .config(groundingConfigConfig);
-    var configWithGrounding = config.withGroundingConfig(groundingConfig);
+var groundingConfig = Grounding.create().filter(databaseFilter);
+var prompt = groundingConfig.createGroundingPrompt("What does Joule do?");
+var configWithGrounding = config.withGrounding(groundingConfig);
 
-    var result =  
-            new OrchestrationClient().chatCompletion(prompt, configWithGrounding);
+var result = client.chatCompletion(prompt, configWithGrounding);
 ```
 
-In this example, the AI model is provided with additional context in the form of grounding information. Note, that it is necessary to provide the grounding input via one or more input variables.
+In this example, the AI model is provided with additional context in the form of grounding information.
+
+`Grounding.create()` is by default a document grounding service with a vector data repository.
+
+Please find [an example in our Spring Boot application](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/services/OrchestrationService.java).
 
 ## Stream chat completion
 
@@ -253,8 +258,116 @@ try (Stream<String> stream = client.streamChatCompletion(prompt, config)) {
 }
 ```
 
-Please find [an example in our Spring Boot application](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/controllers/OrchestrationController.java).
+Please find [an example in our Spring Boot application](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/services/OrchestrationService.java).
 It shows the usage of Spring Boot's `ResponseBodyEmitter` to stream the chat completion delta messages to the frontend in real-time.
+
+
+## Add images and multiple text inputs to a message
+
+It's possible to add images and multiple text inputs to a message.
+
+### Add images to a message
+
+An image can be added to a message as follows.
+
+```java
+var message = Message.user("Describe the following image");
+var newMessage = message.withImage("https://url.to/image.jpg");
+```
+
+You can also construct a message with an image directly, using the `ImageItem` class.
+
+```java
+var message = Message.user(new ImageItem("https://url.to/image.jpg"));
+```
+
+Some AI models, like GPT 4o, support additionally setting the detail level with which the image is read. This can be set via the `DetailLevel` parameter.
+
+```java
+var newMessage = message.withImage("https://url.to/image.jpg", ImageItem.DetailLevel.LOW);
+```
+Note, that currently only user messages are supported for image attachments.
+
+### Add multiple text inputs to a message
+
+It's also possible to add multiple text inputs to a message. This can be useful for providing additional context to the AI model. You can add additional text inputs as follows.
+
+```java
+var message = Message.user("What is chess about?");
+var newMessage = message.withText("Answer in two sentences.");
+```
+
+Note, that only user and system messages are supported for multiple text inputs.
+
+Please find [an example in our Spring Boot application](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/services/OrchestrationService.java).
+
+
+## Set a Response Format
+
+It is possible to set the response format for the chat completion. Available options are using `JSON_OBJECT`, `JSON_SCHEMA`, and `TEXT`, where `TEXT` is the default behavior.
+
+### JSON_OBJECT
+
+Setting the response format to `JSON_OBJECT` tells the AI to respond with JSON, i.e., the response from the AI will be a string consisting of a valid JSON. This does, however, not guarantee that the response adheres to a specific structure (other than being valid JSON).
+
+```java
+var template = Message.user("What is 'apple' in German?");
+var templatingConfig =
+        Template.create()
+                .template(List.of(template.createChatMessage()))
+                .responseFormat(
+                        ResponseFormatJsonObject.create()
+                                .type(ResponseFormatJsonObject.TypeEnum.JSON_OBJECT));
+var configWithTemplate = llmWithImageSupportConfig.withTemplateConfig(templatingConfig);
+
+var prompt =
+        new OrchestrationPrompt(
+                Message.system(
+                        "You are a language translator. Answer using the following JSON format: {\"language\": ..., \"translation\": ...}"));
+var response = client.chatCompletion(prompt, configWithTemplate).getContent();
+```
+Note, that it is necessary to tell the AI model to actually return a JSON object in the prompt. The result might not adhere exactly to the given JSON format, but it will be a JSON object.
+
+
+### JSON_SCHEMA
+
+If you want the response to not only consist of valid JSON but additionally adhere to a specific JSON schema, you can use `JSON_SCHEMA`. in order to do that, add a JSON schema to the configuration as shown below and the response will adhere to the given schema.
+
+```java
+var template = Message.user("Whats '%s' in German?".formatted(word));
+var schema =
+        Map.of(
+                "type",
+                "object",
+                "properties",
+                Map.of(
+                        "language", Map.of("type", "string"),
+                        "translation", Map.of("type", "string")),
+                "required",
+                List.of("language", "translation"),
+                "additionalProperties",
+                false);
+
+// Note, that we plan to add more convenient ways to add a JSON schema in the future.
+var templatingConfig =
+        Template.create()
+                .template(List.of(template.createChatMessage()))
+                .responseFormat(
+                        ResponseFormatJsonSchema.create()
+                                .type(ResponseFormatJsonSchema.TypeEnum.JSON_SCHEMA)
+                                .jsonSchema(
+                                        ResponseFormatJsonSchemaJsonSchema.create()
+                                                .name("translation_response")
+                                                .schema(schema)
+                                                .strict(true)
+                                                .description("Output schema for language translation.")));
+var configWithTemplate = llmWithImageSupportConfig.withTemplateConfig(templatingConfig);
+
+var prompt = new OrchestrationPrompt(Message.system("You are a language translator."));
+var response = client.chatCompletion(prompt, configWithTemplate).getContent();
+```
+
+Please find [an example in our Spring Boot application](../../sample-code/spring-app/src/main/java/com/sap/ai/sdk/app/services/OrchestrationService.java)
 
 ## Set model parameters
 
